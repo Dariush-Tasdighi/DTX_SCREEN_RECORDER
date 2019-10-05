@@ -23,7 +23,7 @@ namespace MY_WINDOWS_APPLICATION
 
 		private Accord.Video.FFMPEG.VideoFileWriter VideoFileWriter { get; set; }
 
-		//private Accord.Video.ScreenCaptureStream ScreenCaptureStream { get; set; }
+		private Accord.DirectSound.AudioCaptureDevice AudioCaptureDevice { get; set; }
 
 		private void Form1_Load(object sender, System.EventArgs e)
 		{
@@ -56,22 +56,22 @@ namespace MY_WINDOWS_APPLICATION
 			// 1200 - 4000 KbPS
 			//  1200 * 1024
 			//int videoBitRate = CaptureRegionWidth * CaptureRegionHeight;
-			int videoBitRate = 200 * 1000;
+			//int videoBitRate = 200 * 1000;
+			int videoBitRate = 1200 * 1000;
 
 			int videoKeyFrameInterval =
 				System.Convert.ToInt32(1000 / (double)videoFrameRate);
 
 			int videoFrameSize =
 				CaptureRegionWidth * CaptureRegionHeight;
+
+			Accord.Math.Rational videoFrameRateRational =
+				new Accord.Math.Rational
+				(numerator: 1000, denominator: videoKeyFrameInterval);
 			// **************************************************
 
 			// **************************************************
-			//timerRecording.Interval = 1000 / videoFrameRate;
-
-			timerRecording.Interval = 100;
-
-			//timerRecording.Interval = 
-			//	videoKeyFrameInterval / videoFrameRate;
+			timerRecording.Interval = videoKeyFrameInterval;
 			// **************************************************
 
 			// **************************************************
@@ -88,10 +88,6 @@ namespace MY_WINDOWS_APPLICATION
 			// **************************************************
 			string pathName =
 				$"D:\\_TEMP\\MOVIE_{ System.DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss") }.avi";
-
-			Accord.Math.Rational frameRate =
-				new Accord.Math.Rational
-				(numerator: 1000, denominator: videoKeyFrameInterval);
 			// **************************************************
 
 			// **************************************************
@@ -101,7 +97,7 @@ namespace MY_WINDOWS_APPLICATION
 					Width = CaptureRegionWidth,
 					Height = CaptureRegionHeight,
 
-					FrameRate = frameRate,
+					FrameRate = videoFrameRateRational,
 					BitRate = videoBitRate,
 
 					VideoCodec = Accord.Video.FFMPEG.VideoCodec.H264,
@@ -130,11 +126,9 @@ namespace MY_WINDOWS_APPLICATION
 			// **************************************************
 
 			// **************************************************
-			Accord.DirectSound.AudioCaptureDevice audioCaptureDevice = null;
-
 			if (audioDeviceGuid.HasValue)
 			{
-				audioCaptureDevice =
+				AudioCaptureDevice =
 					new Accord.DirectSound.AudioCaptureDevice(device: audioDeviceGuid.Value)
 					{
 						SampleRate = audioSampleRate,
@@ -142,9 +136,7 @@ namespace MY_WINDOWS_APPLICATION
 						Format = Accord.Audio.SampleFormat.Format32BitIeeeFloat,
 					};
 
-				audioCaptureDevice.AudioSourceError += AudioCaptureDevice_AudioSourceError;
-
-				audioCaptureDevice.Start();
+				AudioCaptureDevice.AudioSourceError += AudioCaptureDevice_AudioSourceError;
 			}
 			// **************************************************
 
@@ -152,9 +144,9 @@ namespace MY_WINDOWS_APPLICATION
 			var audioCaptureDevices =
 				new System.Collections.Generic.List<Accord.DirectSound.AudioCaptureDevice>();
 
-			if (audioCaptureDevice != null)
+			if (AudioCaptureDevice != null)
 			{
-				audioCaptureDevices.Add(audioCaptureDevice);
+				audioCaptureDevices.Add(AudioCaptureDevice);
 			}
 			// **************************************************
 
@@ -166,8 +158,6 @@ namespace MY_WINDOWS_APPLICATION
 
 				AudioSourceMixer.NewFrame += AudioSourceMixer_NewFrame;
 				AudioSourceMixer.AudioSourceError += AudioSourceMixer_AudioSourceError;
-
-				AudioSourceMixer.Start();
 
 				VideoFileWriter.FrameSize = audioFrameSize;
 				VideoFileWriter.AudioBitRate = audioBitRate;
@@ -322,12 +312,34 @@ namespace MY_WINDOWS_APPLICATION
 			IsRecording = true;
 			RecordingStartTime = System.DateTime.MinValue;
 
+			if (AudioCaptureDevice != null)
+			{
+				AudioCaptureDevice.Start();
+			}
+
+			if (AudioSourceMixer != null)
+			{
+				AudioSourceMixer.Start();
+			}
+
 			timerRecording.Start();
 		}
 
 		private void StopButton_Click(object sender, System.EventArgs e)
 		{
 			IsRecording = false;
+
+			if (AudioSourceMixer != null)
+			{
+				AudioSourceMixer.Stop();
+				//AudioSourceMixer.WaitForStop();
+			}
+
+			if (AudioCaptureDevice != null)
+			{
+				AudioCaptureDevice.Stop();
+				//AudioCaptureDevice.WaitForStop();
+			}
 
 			timerRecording.Stop();
 
